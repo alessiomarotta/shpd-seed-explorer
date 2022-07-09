@@ -1,0 +1,731 @@
+ .../actors/hero/Hero.java                     |  22 +--
+ .../actors/hero/HeroClass.java                |  46 ++++-
+ .../actors/mobs/npcs/Ghost.java               |   4 +-
+ .../actors/mobs/npcs/Imp.java                 |   5 +-
+ .../actors/mobs/npcs/Wandmaker.java           |   8 +-
+ .../shatteredpixeldungeon/effects/Chains.java |   2 +-
+ .../items/artifacts/CloakOfShadows.java       |   9 +-
+ .../items/artifacts/EtherealChains.java       |  48 +----
+ .../items/scrolls/ScrollOfAwareness.java      | 177 ++++++++++++++++++
+ .../shatteredpixeldungeon/levels/Level.java   |  29 ++-
+ .../ui/ScrollableWindow.java                  |  41 ++++
+ 11 files changed, 308 insertions(+), 83 deletions(-)
+ create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
+ create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
+
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
+index 8b43071c4..e0aafd767 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
+@@ -447,24 +447,8 @@ public class Hero extends Char {
+ 	
+ 	@Override
+ 	public int attackSkill( Char target ) {
+-		KindOfWeapon wep = belongings.weapon();
+-		
+-		float accuracy = 1;
+-		accuracy *= RingOfAccuracy.accuracyMultiplier( this );
+-		
+-		if (wep instanceof MissileWeapon){
+-			if (Dungeon.level.adjacent( pos, target.pos )) {
+-				accuracy *= (0.5f + 0.2f*pointsInTalent(Talent.POINT_BLANK));
+-			} else {
+-				accuracy *= 1.5f;
+-			}
+-		}
+-		
+-		if (wep != null) {
+-			return (int)(attackSkill * accuracy * wep.accuracyFactor( this ));
+-		} else {
+-			return (int)(attackSkill * accuracy);
+-		}
++		float accuracy = INFINITE_ACCURACY;
++		return (int)(attackSkill * accuracy);
+ 	}
+ 	
+ 	@Override
+@@ -1251,7 +1235,7 @@ public class Hero extends Char {
+ 		}
+ 
+ 		int preHP = HP + shielding();
+-		super.damage( dmg, src );
++		super.damage( 0, src );
+ 		int postHP = HP + shielding();
+ 		int effectiveDamage = preHP - postHP;
+ 
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java
+index 2fba78989..cd32338b8 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java
+@@ -44,22 +44,28 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+ import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
+ import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClothArmor;
+ import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.CloakOfShadows;
++import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.EtherealChains;
+ import com.shatteredpixel.shatteredpixeldungeon.items.bags.VelvetPouch;
+ import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+ import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
+ import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfInvisibility;
+ import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfLiquidFlame;
+ import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfMindVision;
++import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfAwareness;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfLullaby;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfMagicMapping;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRage;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfDivination;
++import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfDisintegration;
+ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
+ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.SpiritBow;
++import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.AssassinsBlade;
++import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Crossbow;
+ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
+ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Gloves;
++import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Greataxe;
+ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
+ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
+ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.ThrowingKnife;
+@@ -97,6 +103,9 @@ public enum HeroClass {
+ 		Waterskin waterskin = new Waterskin();
+ 		waterskin.collect();
+ 
++		ScrollOfAwareness scroll = new ScrollOfAwareness();
++		scroll.collect();
++
+ 		new ScrollOfIdentify().identify();
+ 
+ 		switch (this) {
+@@ -119,7 +128,7 @@ public enum HeroClass {
+ 
+ 		for (int s = 0; s < QuickSlot.SIZE; s++){
+ 			if (Dungeon.quickslot.getItem(s) == null){
+-				Dungeon.quickslot.setSlot(s, waterskin);
++				Dungeon.quickslot.setSlot(s, scroll);
+ 				break;
+ 			}
+ 		}
+@@ -141,10 +150,17 @@ public enum HeroClass {
+ 	}
+ 
+ 	private static void initWarrior( Hero hero ) {
+-		(hero.belongings.weapon = new WornShortsword()).identify();
++		(hero.belongings.weapon = new Greataxe()).identify();
++		hero.belongings.weapon.upgrade(100);
+ 		ThrowingStone stones = new ThrowingStone();
+ 		stones.quantity(3).collect();
++
++		EtherealChains chains = new EtherealChains();
++		(hero.belongings.artifact = chains).identify();
++		hero.belongings.artifact.activate(hero);
++
+ 		Dungeon.quickslot.setSlot(0, stones);
++		Dungeon.quickslot.setSlot(1, chains);
+ 
+ 		if (hero.belongings.armor != null){
+ 			hero.belongings.armor.affixSeal(new BrokenSeal());
+@@ -157,29 +173,41 @@ public enum HeroClass {
+ 	private static void initMage( Hero hero ) {
+ 		MagesStaff staff;
+ 
+-		staff = new MagesStaff(new WandOfMagicMissile());
++		staff = new MagesStaff(new WandOfDisintegration());
+ 
+ 		(hero.belongings.weapon = staff).identify();
+ 		hero.belongings.weapon.activate(hero);
++		hero.belongings.weapon.upgrade(100);
++
++		EtherealChains chains = new EtherealChains();
++		(hero.belongings.artifact = chains).identify();
++		hero.belongings.artifact.activate(hero);
+ 
+ 		Dungeon.quickslot.setSlot(0, staff);
++		Dungeon.quickslot.setSlot(1, chains);
+ 
+ 		new ScrollOfUpgrade().identify();
+ 		new PotionOfLiquidFlame().identify();
+ 	}
+ 
+ 	private static void initRogue( Hero hero ) {
+-		(hero.belongings.weapon = new Dagger()).identify();
++		(hero.belongings.weapon = new AssassinsBlade()).identify();
++		hero.belongings.weapon.upgrade(100);
+ 
+ 		CloakOfShadows cloak = new CloakOfShadows();
+ 		(hero.belongings.artifact = cloak).identify();
+ 		hero.belongings.artifact.activate( hero );
+ 
++		EtherealChains chains = new EtherealChains();
++		(hero.belongings.misc = chains).identify();
++		hero.belongings.misc.activate(hero);
++
+ 		ThrowingKnife knives = new ThrowingKnife();
+ 		knives.quantity(3).collect();
+ 
+ 		Dungeon.quickslot.setSlot(0, cloak);
+-		Dungeon.quickslot.setSlot(1, knives);
++		Dungeon.quickslot.setSlot(1, chains);
++		Dungeon.quickslot.setSlot(2, knives);
+ 
+ 		new ScrollOfMagicMapping().identify();
+ 		new PotionOfInvisibility().identify();
+@@ -187,11 +215,17 @@ public enum HeroClass {
+ 
+ 	private static void initHuntress( Hero hero ) {
+ 
+-		(hero.belongings.weapon = new Gloves()).identify();
++		(hero.belongings.weapon = new Crossbow()).identify();
++		hero.belongings.weapon.upgrade(100);
+ 		SpiritBow bow = new SpiritBow();
+ 		bow.identify().collect();
+ 
++		EtherealChains chains = new EtherealChains();
++		(hero.belongings.artifact = chains).identify();
++		hero.belongings.artifact.activate(hero);
++
+ 		Dungeon.quickslot.setSlot(0, bow);
++		Dungeon.quickslot.setSlot(1, chains);
+ 
+ 		new PotionOfMindVision().identify();
+ 		new ScrollOfLullaby().identify();
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
+index e0d44c51b..01b6f4f32 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
+@@ -200,14 +200,14 @@ public class Ghost extends NPC {
+ 
+ 	public static class Quest {
+ 		
+-		private static boolean spawned;
++		public static boolean spawned;
+ 
+ 		private static int type;
+ 
+ 		private static boolean given;
+ 		private static boolean processed;
+ 		
+-		private static int depth;
++		public static int depth;
+ 		
+ 		public static Weapon weapon;
+ 		public static Armor armor;
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java
+index b42fd36ba..a6de812ec 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java
+@@ -148,11 +148,12 @@ public class Imp extends NPC {
+ 		
+ 		private static boolean alternative;
+ 		
+-		private static boolean spawned;
++		public static boolean spawned;
+ 		private static boolean given;
+ 		private static boolean completed;
+ 		
+ 		public static Ring reward;
++		public static int depth;
+ 		
+ 		public static void reset() {
+ 			spawned = false;
+@@ -200,6 +201,8 @@ public class Imp extends NPC {
+ 		
+ 		public static void spawn( CityLevel level ) {
+ 			if (!spawned && Dungeon.depth > 16 && Random.Int( 20 - Dungeon.depth ) == 0) {
++
++				depth = Dungeon.depth;
+ 				
+ 				Imp npc = new Imp();
+ 				do {
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java
+index 740aa90b0..891e353c4 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java
+@@ -201,12 +201,13 @@ public class Wandmaker extends NPC {
+ 	
+ 	public static class Quest {
+ 
+-		private static int type;
++		public static int type;
+ 		// 1 = corpse dust quest
+ 		// 2 = elemental embers quest
+ 		// 3 = rotberry quest
+ 		
+-		private static boolean spawned;
++		public static boolean spawned;
++		public static int depth;
+ 		
+ 		private static boolean given;
+ 		
+@@ -283,6 +284,7 @@ public class Wandmaker extends NPC {
+ 			if (questRoomSpawned) {
+ 				
+ 				questRoomSpawned = false;
++				depth = Dungeon.depth;
+ 				
+ 				Wandmaker npc = new Wandmaker();
+ 				boolean validPos;
+@@ -316,7 +318,7 @@ public class Wandmaker extends NPC {
+ 				} while (wand2.getClass().equals(wand1.getClass()));
+ 				wand2.cursed = false;
+ 				wand2.upgrade();
+-				
++
+ 			}
+ 		}
+ 		
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java
+index 644444885..dd27dc9b8 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java
+@@ -63,7 +63,7 @@ public class Chains extends Group {
+ 		distance = (float)Math.hypot(dx, dy);
+ 
+ 
+-		duration = distance/300f + 0.1f;
++		duration = 0.1f;
+ 
+ 		rotation = (float)(Math.atan2( dy, dx ) * A) + 90f;
+ 
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/CloakOfShadows.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/CloakOfShadows.java
+index 7aa822a0c..d46de0987 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/CloakOfShadows.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/CloakOfShadows.java
+@@ -302,15 +302,12 @@ public class CloakOfShadows extends Artifact {
+ 
+ 		@Override
+ 		public boolean act(){
+-			turnsToCost--;
++			turnsToCost = Math.max(0, turnsToCost-1);
+ 			
+ 			if (turnsToCost <= 0){
+ 				charge--;
+-				if (charge < 0) {
+-					charge = 0;
+-					detach();
+-					GLog.w(Messages.get(this, "no_charge"));
+-					((Hero) target).interrupt();
++				if (charge < 1) {
++					charge = 1;
+ 				} else {
+ 					//target hero level is 1 + 2*cloak level
+ 					int lvlDiffFromTarget = ((Hero) target).lvl - (1+level()*2);
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/EtherealChains.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/EtherealChains.java
+index 56b838218..370a3fc61 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/EtherealChains.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/artifacts/EtherealChains.java
+@@ -111,13 +111,6 @@ public class EtherealChains extends Artifact {
+ 		@Override
+ 		public void onSelect(Integer target) {
+ 			if (target != null && (Dungeon.level.visited[target] || Dungeon.level.mapped[target])){
+-
+-				//chains cannot be used to go where it is impossible to walk to
+-				PathFinder.buildDistanceMap(target, BArray.or(Dungeon.level.passable, Dungeon.level.avoid, null));
+-				if (PathFinder.distance[curUser.pos] == Integer.MAX_VALUE){
+-					GLog.w( Messages.get(EtherealChains.class, "cant_reach") );
+-					return;
+-				}
+ 				
+ 				final Ballistica chain = new Ballistica(curUser.pos, target, Ballistica.STOP_TARGET);
+ 				
+@@ -164,14 +157,9 @@ public class EtherealChains extends Artifact {
+ 		final int pulledPos = bestPos;
+ 		
+ 		int chargeUse = Dungeon.level.distance(enemy.pos, pulledPos);
+-		if (chargeUse > charge) {
+-			GLog.w( Messages.get(this, "no_charge") );
+-			return;
+-		} else {
+-			charge -= chargeUse;
+-			Talent.onArtifactUsed(hero);
+-			updateQuickslot();
+-		}
++		charge = Math.max(1, charge-chargeUse);
++		Talent.onArtifactUsed(hero);
++		updateQuickslot();
+ 		
+ 		hero.busy();
+ 		throwSound();
+@@ -195,12 +183,6 @@ public class EtherealChains extends Artifact {
+ 	//pulls the hero along the chain to the collisionPos, if possible.
+ 	private void chainLocation( Ballistica chain, final Hero hero ){
+ 
+-		//don't pull if rooted
+-		if (hero.rooted){
+-			GLog.w( Messages.get(EtherealChains.class, "rooted") );
+-			return;
+-		}
+-
+ 		//don't pull if the collision spot is in a wall
+ 		if (Dungeon.level.solid[chain.collisionPos]
+ 			|| !(Dungeon.level.passable[chain.collisionPos] || Dungeon.level.avoid[chain.collisionPos])){
+@@ -208,30 +190,12 @@ public class EtherealChains extends Artifact {
+ 			return;
+ 		}
+ 		
+-		//don't pull if there are no solid objects next to the pull location
+-		boolean solidFound = false;
+-		for (int i : PathFinder.NEIGHBOURS8){
+-			if (Dungeon.level.solid[chain.collisionPos + i]){
+-				solidFound = true;
+-				break;
+-			}
+-		}
+-		if (!solidFound){
+-			GLog.i( Messages.get(EtherealChains.class, "nothing_to_grab") );
+-			return;
+-		}
+-		
+ 		final int newHeroPos = chain.collisionPos;
+ 		
+ 		int chargeUse = Dungeon.level.distance(hero.pos, newHeroPos);
+-		if (chargeUse > charge){
+-			GLog.w( Messages.get(EtherealChains.class, "no_charge") );
+-			return;
+-		} else {
+-			charge -= chargeUse;
+-			Talent.onArtifactUsed(hero);
+-			updateQuickslot();
+-		}
++		charge = Math.max(1, charge-chargeUse);
++		Talent.onArtifactUsed(hero);
++		updateQuickslot();
+ 		
+ 		hero.busy();
+ 		throwSound();
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
+new file mode 100644
+index 000000000..8fb4f2331
+--- /dev/null
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
+@@ -0,0 +1,177 @@
++/*
++ * Pixel Dungeon
++ * Copyright (C) 2012-2015 Oleg Dolya
++ *
++ * Shattered Pixel Dungeon
++ * Copyright (C) 2014-2022 Evan Debenham
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>
++ */
++
++package com.shatteredpixel.shatteredpixeldungeon.items.scrolls;
++
++import java.util.ArrayList;
++
++import com.shatteredpixel.shatteredpixeldungeon.Assets;
++import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
++import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Ghost;
++import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
++import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
++import com.shatteredpixel.shatteredpixeldungeon.items.Item;
++import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
++import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
++import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
++import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
++import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
++import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MeleeWeapon;
++import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
++import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
++import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollableWindow;
++import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
++import com.watabou.noosa.audio.Sample;
++
++public class ScrollOfAwareness extends Scroll {
++	
++	{
++		icon = ItemSpriteSheet.Icons.SCROLL_FORESIGHT;
++		image = ItemSpriteSheet.SCROLL_YNGVI;
++		unique = true;
++	}
++	
++	private void addText(String caption, ArrayList<? extends Item> items, StringBuilder builder) {
++		if (!items.isEmpty()) {
++			builder.append(caption + ":\n");
++
++			for (Item item : items) {
++				String cursed_status = "";
++				String level = "";
++				String quantity = "";
++
++				if (item.cursed && !(item instanceof Armor || item instanceof Weapon)) cursed_status = "cursed ";
++				if (item.level() > 0) level = " +" + Integer.toString(item.level());
++				if (item.quantity() > 1) quantity = " x" + Integer.toString(item.quantity());
++				
++				builder.append("- " + cursed_status + item.name().toLowerCase() + level + quantity + "\n");
++			}
++
++			builder.append("\n");
++		}
++	}
++
++	@Override
++	public void doRead() {
++		StringBuilder builder = new StringBuilder();
++
++		ArrayList<Scroll> scrolls = new ArrayList<>();
++		ArrayList<Potion> potions = new ArrayList<>();
++		ArrayList<Item> equipment = new ArrayList<>();
++		ArrayList<Wand> wands = new ArrayList<>();
++		ArrayList<Item> others = new ArrayList<>();
++
++		for (Item item : Dungeon.level.generatedItems) {
++			if (item instanceof Scroll)
++				scrolls.add((Scroll) item);
++
++			else if (item instanceof Potion)
++				potions.add((Potion) item);
++
++			else if (item instanceof MeleeWeapon || item instanceof Armor || item instanceof Ring)
++				equipment.add(item);
++			
++			else if (item instanceof Wand)
++				wands.add((Wand) item);
++			
++			else
++				others.add(item);
++		}
++
++		if (Ghost.Quest.spawned && Ghost.Quest.depth == Dungeon.depth) {
++			ArrayList<Item> rewards = new ArrayList<>();
++			rewards.add(Ghost.Quest.armor);
++			rewards.add(Ghost.Quest.weapon);
++
++			addText("_Ghost quest rewards_", rewards, builder);
++		}
++
++		if (Wandmaker.Quest.spawned && Wandmaker.Quest.depth == Dungeon.depth) {
++			ArrayList<Item> rewards = new ArrayList<>();
++			rewards.add(Wandmaker.Quest.wand1);
++			rewards.add(Wandmaker.Quest.wand2);
++
++			builder.append("_Wandmaker quest item_: ");
++
++			switch (Wandmaker.Quest.type) {
++				case 1: default:
++					builder.append("corpse dust\n\n");
++					break;
++				case 2:
++					builder.append("fresh embers\n\n");
++					break;
++				case 3:
++					builder.append("rotberry seed\n\n");
++			}
++
++			addText("_Wandmaker quest rewards_", rewards, builder);
++		}
++
++		if (Imp.Quest.spawned && Imp.Quest.depth == Dungeon.depth) {
++			ArrayList<Ring> rewards = new ArrayList<>();
++			rewards.add(Imp.Quest.reward);
++
++			addText("_Imp quest reward_", rewards, builder);
++		}
++
++		addText("_Scrolls_", scrolls, builder);
++		addText("_Potions_", potions, builder);
++		addText("_Equipment_", equipment, builder);
++		addText("_Wands_", wands, builder);
++		addText("_Other_", others, builder);
++
++		if (builder.length() == 0) {
++			GLog.i("No items found on this level");
++		} else {
++			builder.setLength(builder.length() - 1); // remove trailing newline
++			GameScene.show(new ScrollableWindow(builder.toString()));
++		}
++
++		collect();
++
++		Sample.INSTANCE.play( Assets.Sounds.READ );
++	}
++
++	@Override
++	public String name() {
++        return "Scroll of Awareness";
++    }
++
++    @Override
++	public String desc() {
++        StringBuilder builder = new StringBuilder();
++
++        builder.append("This scroll will show you all the generated items in the current floor ");
++		builder.append("and any quest rewards. ");
++		builder.append("This scroll won't be consumed after being read.");
++
++		return builder.toString();
++    }
++
++    @Override public boolean isIdentified() {
++        return true;
++    }
++
++    @Override public boolean isKnown() {
++		return true;
++	}
++	
++}
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
+index 4f3f91417..0027c919f 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
+@@ -52,13 +52,16 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
+ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
+ import com.shatteredpixel.shatteredpixeldungeon.effects.particles.FlowParticle;
+ import com.shatteredpixel.shatteredpixeldungeon.effects.particles.WindParticle;
++import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
+ import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
++import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+ import com.shatteredpixel.shatteredpixeldungeon.items.Stylus;
+ import com.shatteredpixel.shatteredpixeldungeon.items.Torch;
+ import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TalismanOfForesight;
+ import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
++import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+ import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
+ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
+ import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfEnchantment;
+@@ -160,6 +163,9 @@ public abstract class Level implements Bundlable {
+ 	
+ 	protected ArrayList<Item> itemsToSpawn = new ArrayList<>();
+ 
++	// TODO: make it an array of heaps when I can identify the heap type
++	public ArrayList<Item> generatedItems = new ArrayList<>();
++
+ 	protected Group visuals;
+ 	
+ 	public int color1 = 0x004400;
+@@ -181,6 +187,7 @@ public abstract class Level implements Bundlable {
+ 	private static final String MOBS		= "mobs";
+ 	private static final String BLOBS		= "blobs";
+ 	private static final String FEELING		= "feeling";
++	private static final String GENERATED_ITEMS = "generatedItems";
+ 
+ 	public void create() {
+ 
+@@ -301,7 +308,8 @@ public abstract class Level implements Bundlable {
+ 		pit			= new boolean[length];
+ 
+ 		openSpace   = new boolean[length];
+-		
++
++		Arrays.fill(visited, true);
+ 		PathFinder.setMapSize(w, h);
+ 	}
+ 	
+@@ -338,6 +346,7 @@ public abstract class Level implements Bundlable {
+ 		traps = new SparseArray<>();
+ 		customTiles = new HashSet<>();
+ 		customWalls = new HashSet<>();
++		generatedItems = new ArrayList<>();
+ 		
+ 		map		= bundle.getIntArray( MAP );
+ 
+@@ -371,6 +380,12 @@ public abstract class Level implements Bundlable {
+ 				heaps.put( heap.pos, heap );
+ 		}
+ 		
++		collection = bundle.getCollection( GENERATED_ITEMS );
++		for (Bundlable i : collection) {
++			Item item = (Item)i;
++			generatedItems.add( item );
++		}
++
+ 		collection = bundle.getCollection( PLANTS );
+ 		for (Bundlable p : collection) {
+ 			Plant plant = (Plant)p;
+@@ -446,6 +461,7 @@ public abstract class Level implements Bundlable {
+ 		bundle.put( MOBS, mobs );
+ 		bundle.put( BLOBS, blobs.values() );
+ 		bundle.put( FEELING, feeling );
++		bundle.put( GENERATED_ITEMS, generatedItems);
+ 		bundle.put( "mobs_to_spawn", mobsToSpawn.toArray(new Class[0]));
+ 		bundle.put( "respawner", respawner );
+ 	}
+@@ -894,7 +910,7 @@ public abstract class Level implements Bundlable {
+ 				n = cell + PathFinder.NEIGHBOURS8[Random.Int( 8 )];
+ 			} while (!passable[n] && !avoid[n]);
+ 			return drop( item, n );
+-			
++
+ 		} else {
+ 			heap.drop(item);
+ 		}
+@@ -902,7 +918,14 @@ public abstract class Level implements Bundlable {
+ 		if (Dungeon.level != null && ShatteredPixelDungeon.scene() instanceof GameScene) {
+ 			pressCell( cell );
+ 		}
+-		
++
++		heap.seen = true;
++
++		if (!(item instanceof Key || item instanceof Dewdrop || item instanceof Gold)) {
++			item.identify();
++			generatedItems.add(item);
++		}
++
+ 		return heap;
+ 	}
+ 	
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
+new file mode 100644
+index 000000000..d61c5eece
+--- /dev/null
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
+@@ -0,0 +1,41 @@
++package com.shatteredpixel.shatteredpixeldungeon.ui;
++
++import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
++import com.watabou.noosa.ui.Component;
++
++// taken from https://github.com/Zrp200/ScrollOfDebughttps://github.com/Zrp200/ScrollOfDebug
++public class ScrollableWindow extends Window {
++	private static final int WIDTH_MIN = 120, WIDTH_MAX = 220;
++
++	public ScrollableWindow(String message) {
++		int width = WIDTH_MIN;
++
++		RenderedTextBlock text = PixelScene.renderTextBlock(6);
++		text.text(message, width);
++
++		while (PixelScene.landscape()
++			   && text.bottom() > (PixelScene.MIN_HEIGHT_L - 10)
++			   && width < WIDTH_MAX) {
++			text.maxWidth(width += 20);
++		}
++
++		int height = (int)text.bottom();
++		int maxHeight = (int)(PixelScene.uiCamera.height * 0.9);
++		boolean needScrollPane = height > maxHeight;
++
++		if (needScrollPane) height = maxHeight;
++		resize((int)text.width(), height);
++
++		if (needScrollPane) {
++			Component wrapper = new Component();
++			wrapper.setSize(text.width(), text.height());
++			ScrollPane sp = new ScrollPane(wrapper);
++			add(sp);
++			wrapper.add(text);
++			text.setPos(0, 0);
++			sp.setSize(wrapper.width(), height);
++		} else {
++			add(text);
++		}
++	}
++}
+\ No newline at end of file
+-- 
+2.37.0
+
