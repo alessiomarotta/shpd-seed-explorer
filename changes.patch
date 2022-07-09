@@ -1,18 +1,41 @@
+ build.gradle                                  |   4 +-
  .../actors/hero/Hero.java                     |  22 +--
- .../actors/hero/HeroClass.java                |  46 ++++-
+ .../actors/hero/HeroClass.java                |  60 ++++--
  .../actors/mobs/npcs/Ghost.java               |   4 +-
  .../actors/mobs/npcs/Imp.java                 |   5 +-
  .../actors/mobs/npcs/Wandmaker.java           |   8 +-
  .../shatteredpixeldungeon/effects/Chains.java |   2 +-
  .../items/artifacts/CloakOfShadows.java       |   9 +-
  .../items/artifacts/EtherealChains.java       |  48 +----
- .../items/scrolls/ScrollOfAwareness.java      | 177 ++++++++++++++++++
- .../shatteredpixeldungeon/levels/Level.java   |  29 ++-
+ .../items/scrolls/Scroll.java                 |   4 +-
+ .../items/scrolls/ScrollOfAwareness.java      | 178 ++++++++++++++++++
+ .../journal/Document.java                     |  47 +++--
+ .../shatteredpixeldungeon/levels/Level.java   |  33 +++-
+ .../scenes/HeroSelectScene.java               |  76 ++++----
+ .../scenes/InterlevelScene.java               |   8 +-
+ .../scenes/TitleScene.java                    |  12 +-
  .../ui/ScrollableWindow.java                  |  41 ++++
- 11 files changed, 308 insertions(+), 83 deletions(-)
+ .../windows/WndRanking.java                   |  51 +++--
+ .../windows/WndStartGame.java                 |  54 +++---
+ 19 files changed, 429 insertions(+), 237 deletions(-)
  create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
  create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
 
+diff --git a/build.gradle b/build.gradle
+index 1a3ecc11a..3c0084ab1 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -11,8 +11,8 @@ buildscript {
+ allprojects {
+ 
+     ext {
+-        appName = 'Shattered Pixel Dungeon'
+-        appPackageName = 'com.shatteredpixel.shatteredpixeldungeon'
++        appName = 'SHPD seed explorer'
++        appPackageName = 'com.shatteredpixel.shpd_seed_explorer'
+ 
+         appVersionCode = 642
+         appVersionName = '1.3.0'
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
 index 8b43071c4..e0aafd767 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
@@ -54,7 +77,7 @@ index 8b43071c4..e0aafd767 100644
  		int effectiveDamage = preHP - postHP;
  
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java
-index 2fba78989..cd32338b8 100644
+index 2fba78989..e3e5359cb 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/HeroClass.java
 @@ -44,22 +44,28 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -188,6 +211,27 @@ index 2fba78989..cd32338b8 100644
  
  		new PotionOfMindVision().identify();
  		new ScrollOfLullaby().identify();
+@@ -286,19 +320,7 @@ public enum HeroClass {
+ 	}
+ 	
+ 	public boolean isUnlocked(){
+-		//always unlock on debug builds
+-		if (DeviceCompat.isDebug()) return true;
+-		
+-		switch (this){
+-			case WARRIOR: default:
+-				return true;
+-			case MAGE:
+-				return Badges.isUnlocked(Badges.Badge.UNLOCK_MAGE);
+-			case ROGUE:
+-				return Badges.isUnlocked(Badges.Badge.UNLOCK_ROGUE);
+-			case HUNTRESS:
+-				return Badges.isUnlocked(Badges.Badge.UNLOCK_HUNTRESS);
+-		}
++		return true;
+ 	}
+ 	
+ 	public String unlockMsg() {
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
 index e0d44c51b..01b6f4f32 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
@@ -392,12 +436,27 @@ index 56b838218..370a3fc61 100644
  		
  		hero.busy();
  		throwSound();
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/Scroll.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/Scroll.java
+index b60d32ef4..78b9e608f 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/Scroll.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/Scroll.java
+@@ -181,7 +181,9 @@ public abstract class Scroll extends Item {
+ 	public abstract void doRead();
+ 
+ 	protected void readAnimation() {
+-		Invisibility.dispel();
++		if (!(this instanceof ScrollOfAwareness))
++			Invisibility.dispel();
++
+ 		curUser.spend( TIME_TO_READ );
+ 		curUser.busy();
+ 		((HeroSprite)curUser.sprite).read();
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
 new file mode 100644
-index 000000000..8fb4f2331
+index 000000000..7e2e1a530
 --- /dev/null
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,178 @@
 +/*
 + * Pixel Dungeon
 + * Copyright (C) 2012-2015 Oleg Dolya
@@ -431,6 +490,7 @@ index 000000000..8fb4f2331
 +import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 +import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 +import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
++import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
 +import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 +import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 +import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
@@ -458,7 +518,8 @@ index 000000000..8fb4f2331
 +				String level = "";
 +				String quantity = "";
 +
-+				if (item.cursed && !(item instanceof Armor || item instanceof Weapon)) cursed_status = "cursed ";
++				if (item.cursed && !(item instanceof Armor || item instanceof Weapon
++					|| item instanceof CorpseDust)) cursed_status = "cursed ";
 +				if (item.level() > 0) level = " +" + Integer.toString(item.level());
 +				if (item.quantity() > 1) quantity = " x" + Integer.toString(item.quantity());
 +				
@@ -541,7 +602,6 @@ index 000000000..8fb4f2331
 +		if (builder.length() == 0) {
 +			GLog.i("No items found on this level");
 +		} else {
-+			builder.setLength(builder.length() - 1); // remove trailing newline
 +			GameScene.show(new ScrollableWindow(builder.toString()));
 +		}
 +
@@ -557,9 +617,9 @@ index 000000000..8fb4f2331
 +
 +    @Override
 +	public String desc() {
-+        StringBuilder builder = new StringBuilder();
++		StringBuilder builder = new StringBuilder();
 +
-+        builder.append("This scroll will show you all the generated items in the current floor ");
++		builder.append("When this scroll is read, it will list all the generated items in the current floor ");
 +		builder.append("and any quest rewards. ");
 +		builder.append("This scroll won't be consumed after being read.");
 +
@@ -575,8 +635,71 @@ index 000000000..8fb4f2331
 +	}
 +	
 +}
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/journal/Document.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/journal/Document.java
+index 22235f8ac..df86fe32d 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/journal/Document.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/journal/Document.java
+@@ -135,35 +135,34 @@ public enum Document {
+ 
+ 	//pages and default states
+ 	static {
+-		boolean debug = DeviceCompat.isDebug();
+ 		//hero starts with these
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_INTRO,          debug ? READ : FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_EXAMINING,      debug ? READ : FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_SURPRISE_ATKS,  debug ? READ : FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_IDING,          debug ? READ : FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_FOOD,           debug ? READ : FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_DIEING,         debug ? READ : FOUND);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_INTRO,          READ);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_EXAMINING,      READ);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_SURPRISE_ATKS,  READ);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_IDING,          READ);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_FOOD,           READ);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_DIEING,         READ);
+ 		//given in sewers
+-		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_SEARCHING,      debug ? READ : NOT_FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put("Strength",           debug ? READ : NOT_FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put("Upgrades",           debug ? READ : NOT_FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put("Looting",            debug ? READ : NOT_FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put("Levelling",          debug ? READ : NOT_FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put("Positioning",        debug ? READ : NOT_FOUND);
+-		ADVENTURERS_GUIDE.pagesStates.put("Magic",              debug ? READ : NOT_FOUND);
++		ADVENTURERS_GUIDE.pagesStates.put(GUIDE_SEARCHING,      READ);
++		ADVENTURERS_GUIDE.pagesStates.put("Strength",           READ);
++		ADVENTURERS_GUIDE.pagesStates.put("Upgrades",           READ);
++		ADVENTURERS_GUIDE.pagesStates.put("Looting",            READ);
++		ADVENTURERS_GUIDE.pagesStates.put("Levelling",          READ);
++		ADVENTURERS_GUIDE.pagesStates.put("Positioning",        READ);
++		ADVENTURERS_GUIDE.pagesStates.put("Magic",              READ);
+ 		
+ 		//given in sewers
+-		ALCHEMY_GUIDE.pagesStates.put("Potions",              debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Stones",               debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Energy_Food",          debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Exotic_Potions",       debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Exotic_Scrolls",       debug ? READ : NOT_FOUND);
++		ALCHEMY_GUIDE.pagesStates.put("Potions",              READ);
++		ALCHEMY_GUIDE.pagesStates.put("Stones",               READ);
++		ALCHEMY_GUIDE.pagesStates.put("Energy_Food",          READ);
++		ALCHEMY_GUIDE.pagesStates.put("Exotic_Potions",       READ);
++		ALCHEMY_GUIDE.pagesStates.put("Exotic_Scrolls",       READ);
+ 		//given in prison
+-		ALCHEMY_GUIDE.pagesStates.put("Bombs",                debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Weapons",              debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Catalysts",            debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Brews_Elixirs",        debug ? READ : NOT_FOUND);
+-		ALCHEMY_GUIDE.pagesStates.put("Spells",               debug ? READ : NOT_FOUND);
++		ALCHEMY_GUIDE.pagesStates.put("Bombs",                READ);
++		ALCHEMY_GUIDE.pagesStates.put("Weapons",              READ);
++		ALCHEMY_GUIDE.pagesStates.put("Catalysts",            READ);
++		ALCHEMY_GUIDE.pagesStates.put("Brews_Elixirs",        READ);
++		ALCHEMY_GUIDE.pagesStates.put("Spells",               READ);
+ 	}
+ 	
+ 	private static final String DOCUMENTS = "documents";
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
-index 4f3f91417..0027c919f 100644
+index 4f3f91417..16a1542bc 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
 @@ -52,13 +52,16 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
@@ -596,17 +719,18 @@ index 4f3f91417..0027c919f 100644
  import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
  import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
  import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfEnchantment;
-@@ -160,6 +163,9 @@ public abstract class Level implements Bundlable {
+@@ -159,6 +162,10 @@ public abstract class Level implements Bundlable {
+ 	public HashSet<CustomTilemap> customWalls;
  	
  	protected ArrayList<Item> itemsToSpawn = new ArrayList<>();
- 
++	public boolean initializedItems;
++
 +	// TODO: make it an array of heaps when I can identify the heap type
 +	public ArrayList<Item> generatedItems = new ArrayList<>();
-+
+ 
  	protected Group visuals;
  	
- 	public int color1 = 0x004400;
-@@ -181,6 +187,7 @@ public abstract class Level implements Bundlable {
+@@ -181,6 +188,7 @@ public abstract class Level implements Bundlable {
  	private static final String MOBS		= "mobs";
  	private static final String BLOBS		= "blobs";
  	private static final String FEELING		= "feeling";
@@ -614,7 +738,16 @@ index 4f3f91417..0027c919f 100644
  
  	public void create() {
  
-@@ -301,7 +308,8 @@ public abstract class Level implements Bundlable {
+@@ -274,6 +282,8 @@ public abstract class Level implements Bundlable {
+ 		createMobs();
+ 		createItems();
+ 
++		initializedItems = true;
++
+ 		Random.popGenerator();
+ 	}
+ 	
+@@ -301,7 +311,8 @@ public abstract class Level implements Bundlable {
  		pit			= new boolean[length];
  
  		openSpace   = new boolean[length];
@@ -624,15 +757,16 @@ index 4f3f91417..0027c919f 100644
  		PathFinder.setMapSize(w, h);
  	}
  	
-@@ -338,6 +346,7 @@ public abstract class Level implements Bundlable {
+@@ -338,6 +349,8 @@ public abstract class Level implements Bundlable {
  		traps = new SparseArray<>();
  		customTiles = new HashSet<>();
  		customWalls = new HashSet<>();
 +		generatedItems = new ArrayList<>();
++		initializedItems = false;
  		
  		map		= bundle.getIntArray( MAP );
  
-@@ -371,6 +380,12 @@ public abstract class Level implements Bundlable {
+@@ -371,6 +384,12 @@ public abstract class Level implements Bundlable {
  				heaps.put( heap.pos, heap );
  		}
  		
@@ -645,7 +779,7 @@ index 4f3f91417..0027c919f 100644
  		collection = bundle.getCollection( PLANTS );
  		for (Bundlable p : collection) {
  			Plant plant = (Plant)p;
-@@ -446,6 +461,7 @@ public abstract class Level implements Bundlable {
+@@ -446,6 +465,7 @@ public abstract class Level implements Bundlable {
  		bundle.put( MOBS, mobs );
  		bundle.put( BLOBS, blobs.values() );
  		bundle.put( FEELING, feeling );
@@ -653,7 +787,7 @@ index 4f3f91417..0027c919f 100644
  		bundle.put( "mobs_to_spawn", mobsToSpawn.toArray(new Class[0]));
  		bundle.put( "respawner", respawner );
  	}
-@@ -894,7 +910,7 @@ public abstract class Level implements Bundlable {
+@@ -894,7 +914,7 @@ public abstract class Level implements Bundlable {
  				n = cell + PathFinder.NEIGHBOURS8[Random.Int( 8 )];
  			} while (!passable[n] && !avoid[n]);
  			return drop( item, n );
@@ -662,7 +796,7 @@ index 4f3f91417..0027c919f 100644
  		} else {
  			heap.drop(item);
  		}
-@@ -902,7 +918,14 @@ public abstract class Level implements Bundlable {
+@@ -902,7 +922,14 @@ public abstract class Level implements Bundlable {
  		if (Dungeon.level != null && ShatteredPixelDungeon.scene() instanceof GameScene) {
  			pressCell( cell );
  		}
@@ -670,7 +804,7 @@ index 4f3f91417..0027c919f 100644
 +
 +		heap.seen = true;
 +
-+		if (!(item instanceof Key || item instanceof Dewdrop || item instanceof Gold)) {
++		if (!(initializedItems || item instanceof Key || item instanceof Dewdrop || item instanceof Gold)) {
 +			item.identify();
 +			generatedItems.add(item);
 +		}
@@ -678,6 +812,152 @@ index 4f3f91417..0027c919f 100644
  		return heap;
  	}
  	
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/HeroSelectScene.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/HeroSelectScene.java
+index d1dcbeafc..3da188c99 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/HeroSelectScene.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/HeroSelectScene.java
+@@ -206,13 +206,7 @@ public class HeroSelectScene extends PixelScene {
+ 		updateOptionsColor();
+ 		btnOptions.visible = false;
+ 
+-		if (DeviceCompat.isDebug() || Badges.isUnlocked(Badges.Badge.VICTORY)){
+-			add(btnOptions);
+-		} else {
+-			Dungeon.challenges = 0;
+-			SPDSettings.challenges(0);
+-			SPDSettings.customSeed("");
+-		}
++		add(btnOptions);
+ 
+ 		btnExit = new ExitButton();
+ 		btnExit.setPos( Camera.main.width - btnExit.width(), 0 );
+@@ -377,43 +371,42 @@ public class HeroSelectScene extends PixelScene {
+ 
+ 			buttons = new ArrayList<>();
+ 			spacers = new ArrayList<>();
+-			if (DeviceCompat.isDebug() || Badges.isUnlocked(Badges.Badge.VICTORY)){
+-				StyledButton seedButton = new StyledButton(Chrome.Type.BLANK, Messages.get(HeroSelectScene.class, "custom_seed"), 6){
+-					@Override
+-					protected void onClick() {
+-						String existingSeedtext = SPDSettings.customSeed();
+-						ShatteredPixelDungeon.scene().addToFront( new WndTextInput(Messages.get(HeroSelectScene.class, "custom_seed_title"),
+-								Messages.get(HeroSelectScene.class, "custom_seed_desc"),
+-								existingSeedtext,
+-								20,
+-								false,
+-								Messages.get(HeroSelectScene.class, "custom_seed_set"),
+-								Messages.get(HeroSelectScene.class, "custom_seed_clear")){
+-							@Override
+-							public void onSelect(boolean positive, String text) {
+-								text = DungeonSeed.formatText(text);
+-								long seed = DungeonSeed.convertFromText(text);
+-
+-								if (positive && seed != -1){
+-
+-									for (GamesInProgress.Info info : GamesInProgress.checkAll()){
+-										if (info.customSeed.isEmpty() && info.seed == seed){
+-											SPDSettings.customSeed("");
+-											icon.resetColor();
+-											ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(HeroSelectScene.class, "custom_seed_duplicate")));
+-											return;
+-										}
++			StyledButton seedButton = new StyledButton(Chrome.Type.BLANK, Messages.get(HeroSelectScene.class, "custom_seed"), 6){
++				@Override
++				protected void onClick() {
++					String existingSeedtext = SPDSettings.customSeed();
++					ShatteredPixelDungeon.scene().addToFront( new WndTextInput(Messages.get(HeroSelectScene.class, "custom_seed_title"),
++							Messages.get(HeroSelectScene.class, "custom_seed_desc"),
++							existingSeedtext,
++							20,
++							false,
++							Messages.get(HeroSelectScene.class, "custom_seed_set"),
++							Messages.get(HeroSelectScene.class, "custom_seed_clear")){
++						@Override
++						public void onSelect(boolean positive, String text) {
++							text = DungeonSeed.formatText(text);
++							long seed = DungeonSeed.convertFromText(text);
++
++							if (positive && seed != -1){
++
++								for (GamesInProgress.Info info : GamesInProgress.checkAll()){
++									if (info.customSeed.isEmpty() && info.seed == seed){
++										SPDSettings.customSeed("");
++										icon.resetColor();
++										ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(HeroSelectScene.class, "custom_seed_duplicate")));
++										return;
+ 									}
+-
+-									SPDSettings.customSeed(text);
+-									icon.hardlight(1f, 1.5f, 0.67f);
+-								} else {
+-									SPDSettings.customSeed("");
+-									icon.resetColor();
+ 								}
+-								updateOptionsColor();
++
++								SPDSettings.customSeed(text);
++								icon.hardlight(1f, 1.5f, 0.67f);
++							} else {
++								SPDSettings.customSeed("");
++								icon.resetColor();
+ 							}
+-						});
++							updateOptionsColor();
++						}
++					});
+ 					}
+ 				};
+ 				seedButton.leftJustify = true;
+@@ -537,7 +530,6 @@ public class HeroSelectScene extends PixelScene {
+ 				challengeButton.icon(Icons.get(SPDSettings.challenges() > 0 ? Icons.CHALLENGE_ON : Icons.CHALLENGE_OFF));
+ 				add(challengeButton);
+ 				buttons.add(challengeButton);
+-			}
+ 
+ 			for (int i = 1; i < buttons.size(); i++){
+ 				ColorBlock spc = new ColorBlock(1, 1, 0xFF000000);
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/InterlevelScene.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/InterlevelScene.java
+index 4c0f53f60..15078f2b8 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/InterlevelScene.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/InterlevelScene.java
+@@ -167,13 +167,7 @@ public class InterlevelScene extends PixelScene {
+ 		else if (lastRegion == 5)    loadingAsset = Assets.Interfaces.LOADING_HALLS;
+ 		else                         loadingAsset = Assets.Interfaces.SHADOW;
+ 		
+-		//slow down transition when displaying an install prompt
+-		if (Updates.isInstallable()){
+-			fadeTime += 0.5f; //adds 1 second total
+-		//speed up transition when debugging
+-		} else if (DeviceCompat.isDebug()){
+-			fadeTime = 0f;
+-		}
++		fadeTime = 0f;
+ 		
+ 		SkinnedBlock bg = new SkinnedBlock(Camera.main.width, Camera.main.height, loadingAsset ){
+ 			@Override
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/TitleScene.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/TitleScene.java
+index 487fe1b52..c97fa32a5 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/TitleScene.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/scenes/TitleScene.java
+@@ -121,14 +121,10 @@ public class TitleScene extends PixelScene {
+ 			
+ 			@Override
+ 			protected boolean onLongClick() {
+-				//making it easier to start runs quickly while debugging
+-				if (DeviceCompat.isDebug()) {
+-					GamesInProgress.selectedClass = null;
+-					GamesInProgress.curSlot = 1;
+-					ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+-					return true;
+-				}
+-				return super.onLongClick();
++				GamesInProgress.selectedClass = null;
++				GamesInProgress.curSlot = 1;
++				ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
++				return true;
+ 			}
+ 		};
+ 		btnPlay.icon(Icons.get(Icons.ENTER));
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
 new file mode 100644
 index 000000000..d61c5eece
@@ -726,6 +1006,139 @@ index 000000000..d61c5eece
 +	}
 +}
 \ No newline at end of file
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndRanking.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndRanking.java
+index 735b71335..907c98622 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndRanking.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndRanking.java
+@@ -213,36 +213,33 @@ public class WndRanking extends WndTabbed {
+ 
+ 			int buttontop = HEIGHT - 16;
+ 
+-			if (Dungeon.seed != -1 && !Dungeon.daily &&
+-					(DeviceCompat.isDebug() || Badges.isUnlocked(Badges.Badge.VICTORY))){
+-				final Image icon = Icons.get(Icons.SEED);
+-				RedButton btnSeed = new RedButton(Messages.get(this, "copy_seed")){
+-					@Override
+-					protected void onClick() {
+-						super.onClick();
+-						ShatteredPixelDungeon.scene().addToFront(new WndOptions(new Image(icon),
+-								Messages.get(WndRanking.StatsTab.this, "copy_seed"),
+-								Messages.get(WndRanking.StatsTab.this, "copy_seed_desc"),
+-								Messages.get(WndRanking.StatsTab.this, "copy_seed_copy"),
+-								Messages.get(WndRanking.StatsTab.this, "copy_seed_cancel")){
+-							@Override
+-							protected void onSelect(int index) {
+-								super.onSelect(index);
+-								if (index == 0){
+-									SPDSettings.customSeed(DungeonSeed.convertToCode(Dungeon.seed));
+-									icon.hardlight(1f, 1.5f, 0.67f);
+-								}
++			final Image icon = Icons.get(Icons.SEED);
++			RedButton btnSeed = new RedButton(Messages.get(this, "copy_seed")){
++				@Override
++				protected void onClick() {
++					super.onClick();
++					ShatteredPixelDungeon.scene().addToFront(new WndOptions(new Image(icon),
++							Messages.get(WndRanking.StatsTab.this, "copy_seed"),
++							Messages.get(WndRanking.StatsTab.this, "copy_seed_desc"),
++							Messages.get(WndRanking.StatsTab.this, "copy_seed_copy"),
++							Messages.get(WndRanking.StatsTab.this, "copy_seed_cancel")){
++						@Override
++						protected void onSelect(int index) {
++							super.onSelect(index);
++							if (index == 0){
++								SPDSettings.customSeed(DungeonSeed.convertToCode(Dungeon.seed));
++								icon.hardlight(1f, 1.5f, 0.67f);
+ 							}
+-						});
+-					}
+-				};
+-				if (DungeonSeed.convertFromText(SPDSettings.customSeed()) == Dungeon.seed){
+-					icon.hardlight(1f, 1.5f, 0.67f);
++						}
++					});
+ 				}
+-				btnSeed.icon(icon);
+-				btnSeed.setRect(0, buttontop, 115, 16);
+-				add(btnSeed);
++			};
++			if (DungeonSeed.convertFromText(SPDSettings.customSeed()) == Dungeon.seed){
++				icon.hardlight(1f, 1.5f, 0.67f);
+ 			}
++			btnSeed.icon(icon);
++			btnSeed.setRect(0, buttontop, 115, 16);
++			add(btnSeed);
+ 
+ 		}
+ 		
+diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndStartGame.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndStartGame.java
+index e41854788..42fcc378a 100644
+--- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndStartGame.java
++++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/windows/WndStartGame.java
+@@ -117,39 +117,33 @@ public class WndStartGame extends Window {
+ 		start.visible = false;
+ 		start.setRect(0, HEIGHT - 20, WIDTH, 20);
+ 		add(start);
+-		
+-		if (DeviceCompat.isDebug() || Badges.isUnlocked(Badges.Badge.VICTORY)){
+-			IconButton challengeButton = new IconButton(
+-					Icons.get( SPDSettings.challenges() > 0 ? Icons.CHALLENGE_ON :Icons.CHALLENGE_OFF)){
+-				@Override
+-				protected void onClick() {
+-					ShatteredPixelDungeon.scene().addToFront(new WndChallenges(SPDSettings.challenges(), true) {
+-						public void onBackPressed() {
+-							super.onBackPressed();
+-							if (parent != null) {
+-								icon(Icons.get(SPDSettings.challenges() > 0 ?
+-										Icons.CHALLENGE_ON : Icons.CHALLENGE_OFF));
+-							}
++
++		IconButton challengeButton = new IconButton(
++				Icons.get( SPDSettings.challenges() > 0 ? Icons.CHALLENGE_ON :Icons.CHALLENGE_OFF)){
++			@Override
++			protected void onClick() {
++				ShatteredPixelDungeon.scene().addToFront(new WndChallenges(SPDSettings.challenges(), true) {
++					public void onBackPressed() {
++						super.onBackPressed();
++						if (parent != null) {
++							icon(Icons.get(SPDSettings.challenges() > 0 ?
++									Icons.CHALLENGE_ON : Icons.CHALLENGE_OFF));
+ 						}
+-					} );
+-				}
+-				
+-				@Override
+-				public void update() {
+-					if( !visible && GamesInProgress.selectedClass != null){
+-						visible = true;
+ 					}
+-					super.update();
+-				}
+-			};
+-			challengeButton.setRect(WIDTH - 20, HEIGHT - 20, 20, 20);
+-			challengeButton.visible = false;
+-			add(challengeButton);
++				} );
++			}
+ 			
+-		} else {
+-			Dungeon.challenges = 0;
+-			SPDSettings.challenges(0);
+-		}
++			@Override
++			public void update() {
++				if( !visible && GamesInProgress.selectedClass != null){
++					visible = true;
++				}
++				super.update();
++			}
++		};
++		challengeButton.setRect(WIDTH - 20, HEIGHT - 20, 20, 20);
++		challengeButton.visible = false;
++		add(challengeButton);
+ 		
+ 		resize(WIDTH, HEIGHT);
+ 		
 -- 
 2.37.0
 

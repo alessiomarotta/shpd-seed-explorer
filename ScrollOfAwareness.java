@@ -31,6 +31,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
@@ -58,7 +59,8 @@ public class ScrollOfAwareness extends Scroll {
 				String level = "";
 				String quantity = "";
 
-				if (item.cursed && !(item instanceof Armor || item instanceof Weapon)) cursed_status = "cursed ";
+				if (item.cursed && !(item instanceof Armor || item instanceof Weapon
+					|| item instanceof CorpseDust)) cursed_status = "cursed ";
 				if (item.level() > 0) level = " +" + Integer.toString(item.level());
 				if (item.quantity() > 1) quantity = " x" + Integer.toString(item.quantity());
 				
@@ -141,7 +143,6 @@ public class ScrollOfAwareness extends Scroll {
 		if (builder.length() == 0) {
 			GLog.i("No items found on this level");
 		} else {
-			builder.setLength(builder.length() - 1); // remove trailing newline
 			GameScene.show(new ScrollableWindow(builder.toString()));
 		}
 
@@ -157,9 +158,9 @@ public class ScrollOfAwareness extends Scroll {
 
     @Override
 	public String desc() {
-        StringBuilder builder = new StringBuilder();
+		StringBuilder builder = new StringBuilder();
 
-        builder.append("This scroll will show you all the generated items in the current floor ");
+		builder.append("When this scroll is read, it will list all the generated items in the current floor ");
 		builder.append("and any quest rewards. ");
 		builder.append("This scroll won't be consumed after being read.");
 
