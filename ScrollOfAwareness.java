@@ -30,6 +30,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
@@ -78,6 +79,8 @@ public class ScrollOfAwareness extends Scroll {
 		ArrayList<Scroll> scrolls = new ArrayList<>();
 		ArrayList<Potion> potions = new ArrayList<>();
 		ArrayList<Item> equipment = new ArrayList<>();
+		ArrayList<Ring> rings = new ArrayList<>();
+		ArrayList<Artifact> artifacts = new ArrayList<>();
 		ArrayList<Wand> wands = new ArrayList<>();
 		ArrayList<Item> others = new ArrayList<>();
 
@@ -88,8 +91,14 @@ public class ScrollOfAwareness extends Scroll {
 			else if (item instanceof Potion)
 				potions.add((Potion) item);
 
-			else if (item instanceof MeleeWeapon || item instanceof Armor || item instanceof Ring)
+			else if (item instanceof MeleeWeapon || item instanceof Armor)
 				equipment.add(item);
+			
+			else if (item instanceof Ring)
+				rings.add((Ring) item);
+			
+			else if (item instanceof Artifact)
+				artifacts.add((Artifact) item);
 			
 			else if (item instanceof Wand)
 				wands.add((Wand) item);
@@ -98,7 +107,7 @@ public class ScrollOfAwareness extends Scroll {
 				others.add(item);
 		}
 
-		if (Ghost.Quest.spawned && Ghost.Quest.depth == Dungeon.depth) {
+		if (Ghost.Quest.armor != null && Ghost.Quest.depth == Dungeon.depth) {
 			ArrayList<Item> rewards = new ArrayList<>();
 			rewards.add(Ghost.Quest.armor);
 			rewards.add(Ghost.Quest.weapon);
@@ -106,7 +115,7 @@ public class ScrollOfAwareness extends Scroll {
 			addText("_Ghost quest rewards_", rewards, builder);
 		}
 
-		if (Wandmaker.Quest.spawned && Wandmaker.Quest.depth == Dungeon.depth) {
+		if (Wandmaker.Quest.wand1 != null && Wandmaker.Quest.depth == Dungeon.depth) {
 			ArrayList<Item> rewards = new ArrayList<>();
 			rewards.add(Wandmaker.Quest.wand1);
 			rewards.add(Wandmaker.Quest.wand2);
@@ -127,7 +136,7 @@ public class ScrollOfAwareness extends Scroll {
 			addText("_Wandmaker quest rewards_", rewards, builder);
 		}
 
-		if (Imp.Quest.spawned && Imp.Quest.depth == Dungeon.depth) {
+		if (Imp.Quest.reward != null && Imp.Quest.depth == Dungeon.depth) {
 			ArrayList<Ring> rewards = new ArrayList<>();
 			rewards.add(Imp.Quest.reward);
 
@@ -137,12 +146,15 @@ public class ScrollOfAwareness extends Scroll {
 		addText("_Scrolls_", scrolls, builder);
 		addText("_Potions_", potions, builder);
 		addText("_Equipment_", equipment, builder);
+		addText("_Rings_", rings, builder);
+		addText("_Artifacts_", artifacts, builder);
 		addText("_Wands_", wands, builder);
 		addText("_Other_", others, builder);
 
-		if (builder.length() == 0) {
+		if (Dungeon.depth % 5 == 0) {
 			GLog.i("No items found on this level");
 		} else {
+			builder.setLength(builder.length()-2); // remove trailing newlines
 			GameScene.show(new ScrollableWindow(builder.toString()));
 		}
 

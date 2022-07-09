@@ -1,23 +1,29 @@
+From 345010ac28fa91751498f1f11f37130a295eabe1 Mon Sep 17 00:00:00 2001
+From: alessiomarotta <alessio.marotta.98@gmail.com>
+Date: Sat, 9 Jul 2022 18:02:17 +0200
+Subject: [PATCH] Implement seed explorer features
+
+---
  build.gradle                                  |   4 +-
- .../actors/hero/Hero.java                     |  22 +--
+ .../actors/hero/Hero.java                     |  22 +-
  .../actors/hero/HeroClass.java                |  60 ++++--
  .../actors/mobs/npcs/Ghost.java               |   4 +-
- .../actors/mobs/npcs/Imp.java                 |   5 +-
- .../actors/mobs/npcs/Wandmaker.java           |   8 +-
+ .../actors/mobs/npcs/Imp.java                 |   3 +
+ .../actors/mobs/npcs/Wandmaker.java           |   6 +-
  .../shatteredpixeldungeon/effects/Chains.java |   2 +-
  .../items/artifacts/CloakOfShadows.java       |   9 +-
  .../items/artifacts/EtherealChains.java       |  48 +----
  .../items/scrolls/Scroll.java                 |   4 +-
- .../items/scrolls/ScrollOfAwareness.java      | 178 ++++++++++++++++++
+ .../items/scrolls/ScrollOfAwareness.java      | 190 ++++++++++++++++++
  .../journal/Document.java                     |  47 +++--
- .../shatteredpixeldungeon/levels/Level.java   |  33 +++-
- .../scenes/HeroSelectScene.java               |  76 ++++----
+ .../shatteredpixeldungeon/levels/Level.java   |  31 ++-
+ .../scenes/HeroSelectScene.java               |  76 ++++---
  .../scenes/InterlevelScene.java               |   8 +-
  .../scenes/TitleScene.java                    |  12 +-
  .../ui/ScrollableWindow.java                  |  41 ++++
  .../windows/WndRanking.java                   |  51 +++--
- .../windows/WndStartGame.java                 |  54 +++---
- 19 files changed, 429 insertions(+), 237 deletions(-)
+ .../windows/WndStartGame.java                 |  54 +++--
+ 19 files changed, 437 insertions(+), 235 deletions(-)
  create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
  create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
 
@@ -233,20 +239,15 @@ index 2fba78989..e3e5359cb 100644
  	
  	public String unlockMsg() {
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
-index e0d44c51b..01b6f4f32 100644
+index e0d44c51b..3c147b418 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Ghost.java
-@@ -200,14 +200,14 @@ public class Ghost extends NPC {
- 
- 	public static class Quest {
- 		
--		private static boolean spawned;
-+		public static boolean spawned;
- 
+@@ -205,9 +205,9 @@ public class Ghost extends NPC {
  		private static int type;
  
  		private static boolean given;
- 		private static boolean processed;
+-		private static boolean processed;
++		public static boolean processed;
  		
 -		private static int depth;
 +		public static int depth;
@@ -254,16 +255,10 @@ index e0d44c51b..01b6f4f32 100644
  		public static Weapon weapon;
  		public static Armor armor;
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java
-index b42fd36ba..a6de812ec 100644
+index b42fd36ba..678148460 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Imp.java
-@@ -148,11 +148,12 @@ public class Imp extends NPC {
- 		
- 		private static boolean alternative;
- 		
--		private static boolean spawned;
-+		public static boolean spawned;
- 		private static boolean given;
+@@ -153,6 +153,7 @@ public class Imp extends NPC {
  		private static boolean completed;
  		
  		public static Ring reward;
@@ -281,7 +276,7 @@ index b42fd36ba..a6de812ec 100644
  				Imp npc = new Imp();
  				do {
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java
-index 740aa90b0..891e353c4 100644
+index 740aa90b0..84f16709c 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/mobs/npcs/Wandmaker.java
 @@ -201,12 +201,13 @@ public class Wandmaker extends NPC {
@@ -308,15 +303,6 @@ index 740aa90b0..891e353c4 100644
  				
  				Wandmaker npc = new Wandmaker();
  				boolean validPos;
-@@ -316,7 +318,7 @@ public class Wandmaker extends NPC {
- 				} while (wand2.getClass().equals(wand1.getClass()));
- 				wand2.cursed = false;
- 				wand2.upgrade();
--				
-+
- 			}
- 		}
- 		
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java
 index 644444885..dd27dc9b8 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/Chains.java
@@ -453,10 +439,10 @@ index b60d32ef4..78b9e608f 100644
  		((HeroSprite)curUser.sprite).read();
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
 new file mode 100644
-index 000000000..7e2e1a530
+index 000000000..c3db6aea6
 --- /dev/null
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,190 @@
 +/*
 + * Pixel Dungeon
 + * Copyright (C) 2012-2015 Oleg Dolya
@@ -489,6 +475,7 @@ index 000000000..7e2e1a530
 +import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
 +import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 +import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
++import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 +import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 +import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
 +import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
@@ -537,6 +524,8 @@ index 000000000..7e2e1a530
 +		ArrayList<Scroll> scrolls = new ArrayList<>();
 +		ArrayList<Potion> potions = new ArrayList<>();
 +		ArrayList<Item> equipment = new ArrayList<>();
++		ArrayList<Ring> rings = new ArrayList<>();
++		ArrayList<Artifact> artifacts = new ArrayList<>();
 +		ArrayList<Wand> wands = new ArrayList<>();
 +		ArrayList<Item> others = new ArrayList<>();
 +
@@ -547,8 +536,14 @@ index 000000000..7e2e1a530
 +			else if (item instanceof Potion)
 +				potions.add((Potion) item);
 +
-+			else if (item instanceof MeleeWeapon || item instanceof Armor || item instanceof Ring)
++			else if (item instanceof MeleeWeapon || item instanceof Armor)
 +				equipment.add(item);
++			
++			else if (item instanceof Ring)
++				rings.add((Ring) item);
++			
++			else if (item instanceof Artifact)
++				artifacts.add((Artifact) item);
 +			
 +			else if (item instanceof Wand)
 +				wands.add((Wand) item);
@@ -557,7 +552,7 @@ index 000000000..7e2e1a530
 +				others.add(item);
 +		}
 +
-+		if (Ghost.Quest.spawned && Ghost.Quest.depth == Dungeon.depth) {
++		if (Ghost.Quest.armor != null && Ghost.Quest.depth == Dungeon.depth) {
 +			ArrayList<Item> rewards = new ArrayList<>();
 +			rewards.add(Ghost.Quest.armor);
 +			rewards.add(Ghost.Quest.weapon);
@@ -565,7 +560,7 @@ index 000000000..7e2e1a530
 +			addText("_Ghost quest rewards_", rewards, builder);
 +		}
 +
-+		if (Wandmaker.Quest.spawned && Wandmaker.Quest.depth == Dungeon.depth) {
++		if (Wandmaker.Quest.wand1 != null && Wandmaker.Quest.depth == Dungeon.depth) {
 +			ArrayList<Item> rewards = new ArrayList<>();
 +			rewards.add(Wandmaker.Quest.wand1);
 +			rewards.add(Wandmaker.Quest.wand2);
@@ -586,7 +581,7 @@ index 000000000..7e2e1a530
 +			addText("_Wandmaker quest rewards_", rewards, builder);
 +		}
 +
-+		if (Imp.Quest.spawned && Imp.Quest.depth == Dungeon.depth) {
++		if (Imp.Quest.reward != null && Imp.Quest.depth == Dungeon.depth) {
 +			ArrayList<Ring> rewards = new ArrayList<>();
 +			rewards.add(Imp.Quest.reward);
 +
@@ -596,12 +591,15 @@ index 000000000..7e2e1a530
 +		addText("_Scrolls_", scrolls, builder);
 +		addText("_Potions_", potions, builder);
 +		addText("_Equipment_", equipment, builder);
++		addText("_Rings_", rings, builder);
++		addText("_Artifacts_", artifacts, builder);
 +		addText("_Wands_", wands, builder);
 +		addText("_Other_", others, builder);
 +
-+		if (builder.length() == 0) {
++		if (Dungeon.depth % 5 == 0) {
 +			GLog.i("No items found on this level");
 +		} else {
++			builder.setLength(builder.length()-2); // remove trailing newlines
 +			GameScene.show(new ScrollableWindow(builder.toString()));
 +		}
 +
@@ -699,14 +697,15 @@ index 22235f8ac..df86fe32d 100644
  	
  	private static final String DOCUMENTS = "documents";
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
-index 4f3f91417..16a1542bc 100644
+index 4f3f91417..503d36364 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
-@@ -52,13 +52,16 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
+@@ -52,13 +52,17 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
  import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
  import com.shatteredpixel.shatteredpixeldungeon.effects.particles.FlowParticle;
  import com.shatteredpixel.shatteredpixeldungeon.effects.particles.WindParticle;
 +import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
++import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
  import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 +import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
  import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
@@ -719,17 +718,16 @@ index 4f3f91417..16a1542bc 100644
  import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
  import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
  import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfEnchantment;
-@@ -159,6 +162,10 @@ public abstract class Level implements Bundlable {
- 	public HashSet<CustomTilemap> customWalls;
+@@ -160,6 +164,9 @@ public abstract class Level implements Bundlable {
  	
  	protected ArrayList<Item> itemsToSpawn = new ArrayList<>();
-+	public boolean initializedItems;
-+
+ 
 +	// TODO: make it an array of heaps when I can identify the heap type
 +	public ArrayList<Item> generatedItems = new ArrayList<>();
- 
++
  	protected Group visuals;
  	
+ 	public int color1 = 0x004400;
 @@ -181,6 +188,7 @@ public abstract class Level implements Bundlable {
  	private static final String MOBS		= "mobs";
  	private static final String BLOBS		= "blobs";
@@ -738,16 +736,7 @@ index 4f3f91417..16a1542bc 100644
  
  	public void create() {
  
-@@ -274,6 +282,8 @@ public abstract class Level implements Bundlable {
- 		createMobs();
- 		createItems();
- 
-+		initializedItems = true;
-+
- 		Random.popGenerator();
- 	}
- 	
-@@ -301,7 +311,8 @@ public abstract class Level implements Bundlable {
+@@ -301,7 +309,8 @@ public abstract class Level implements Bundlable {
  		pit			= new boolean[length];
  
  		openSpace   = new boolean[length];
@@ -757,16 +746,15 @@ index 4f3f91417..16a1542bc 100644
  		PathFinder.setMapSize(w, h);
  	}
  	
-@@ -338,6 +349,8 @@ public abstract class Level implements Bundlable {
+@@ -338,6 +347,7 @@ public abstract class Level implements Bundlable {
  		traps = new SparseArray<>();
  		customTiles = new HashSet<>();
  		customWalls = new HashSet<>();
 +		generatedItems = new ArrayList<>();
-+		initializedItems = false;
  		
  		map		= bundle.getIntArray( MAP );
  
-@@ -371,6 +384,12 @@ public abstract class Level implements Bundlable {
+@@ -371,6 +381,12 @@ public abstract class Level implements Bundlable {
  				heaps.put( heap.pos, heap );
  		}
  		
@@ -779,7 +767,7 @@ index 4f3f91417..16a1542bc 100644
  		collection = bundle.getCollection( PLANTS );
  		for (Bundlable p : collection) {
  			Plant plant = (Plant)p;
-@@ -446,6 +465,7 @@ public abstract class Level implements Bundlable {
+@@ -446,6 +462,7 @@ public abstract class Level implements Bundlable {
  		bundle.put( MOBS, mobs );
  		bundle.put( BLOBS, blobs.values() );
  		bundle.put( FEELING, feeling );
@@ -787,7 +775,7 @@ index 4f3f91417..16a1542bc 100644
  		bundle.put( "mobs_to_spawn", mobsToSpawn.toArray(new Class[0]));
  		bundle.put( "respawner", respawner );
  	}
-@@ -894,7 +914,7 @@ public abstract class Level implements Bundlable {
+@@ -894,7 +911,7 @@ public abstract class Level implements Bundlable {
  				n = cell + PathFinder.NEIGHBOURS8[Random.Int( 8 )];
  			} while (!passable[n] && !avoid[n]);
  			return drop( item, n );
@@ -796,7 +784,7 @@ index 4f3f91417..16a1542bc 100644
  		} else {
  			heap.drop(item);
  		}
-@@ -902,7 +922,14 @@ public abstract class Level implements Bundlable {
+@@ -902,7 +919,15 @@ public abstract class Level implements Bundlable {
  		if (Dungeon.level != null && ShatteredPixelDungeon.scene() instanceof GameScene) {
  			pressCell( cell );
  		}
@@ -804,7 +792,8 @@ index 4f3f91417..16a1542bc 100644
 +
 +		heap.seen = true;
 +
-+		if (!(initializedItems || item instanceof Key || item instanceof Dewdrop || item instanceof Gold)) {
++		if (!(item instanceof Key || item instanceof Dewdrop
++			  || item instanceof Gold || item instanceof EnergyCrystal)) {
 +			item.identify();
 +			generatedItems.add(item);
 +		}
@@ -960,7 +949,7 @@ index 487fe1b52..c97fa32a5 100644
  		btnPlay.icon(Icons.get(Icons.ENTER));
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
 new file mode 100644
-index 000000000..d61c5eece
+index 000000000..e92c50d29
 --- /dev/null
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
 @@ -0,0 +1,41 @@
@@ -971,7 +960,7 @@ index 000000000..d61c5eece
 +
 +// taken from https://github.com/Zrp200/ScrollOfDebughttps://github.com/Zrp200/ScrollOfDebug
 +public class ScrollableWindow extends Window {
-+	private static final int WIDTH_MIN = 120, WIDTH_MAX = 220;
++	private static final int WIDTH_MIN = 120000, WIDTH_MAX = 220;
 +
 +	public ScrollableWindow(String message) {
 +		int width = WIDTH_MIN;
