@@ -1,47 +1,3 @@
-From 345010ac28fa91751498f1f11f37130a295eabe1 Mon Sep 17 00:00:00 2001
-From: alessiomarotta <alessio.marotta.98@gmail.com>
-Date: Sat, 9 Jul 2022 18:02:17 +0200
-Subject: [PATCH] Implement seed explorer features
-
----
- build.gradle                                  |   4 +-
- .../actors/hero/Hero.java                     |  22 +-
- .../actors/hero/HeroClass.java                |  60 ++++--
- .../actors/mobs/npcs/Ghost.java               |   4 +-
- .../actors/mobs/npcs/Imp.java                 |   3 +
- .../actors/mobs/npcs/Wandmaker.java           |   6 +-
- .../shatteredpixeldungeon/effects/Chains.java |   2 +-
- .../items/artifacts/CloakOfShadows.java       |   9 +-
- .../items/artifacts/EtherealChains.java       |  48 +----
- .../items/scrolls/Scroll.java                 |   4 +-
- .../items/scrolls/ScrollOfAwareness.java      | 190 ++++++++++++++++++
- .../journal/Document.java                     |  47 +++--
- .../shatteredpixeldungeon/levels/Level.java   |  31 ++-
- .../scenes/HeroSelectScene.java               |  76 ++++---
- .../scenes/InterlevelScene.java               |   8 +-
- .../scenes/TitleScene.java                    |  12 +-
- .../ui/ScrollableWindow.java                  |  41 ++++
- .../windows/WndRanking.java                   |  51 +++--
- .../windows/WndStartGame.java                 |  54 +++--
- 19 files changed, 437 insertions(+), 235 deletions(-)
- create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
- create mode 100644 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/ui/ScrollableWindow.java
-
-diff --git a/build.gradle b/build.gradle
-index 1a3ecc11a..3c0084ab1 100644
---- a/build.gradle
-+++ b/build.gradle
-@@ -11,8 +11,8 @@ buildscript {
- allprojects {
- 
-     ext {
--        appName = 'Shattered Pixel Dungeon'
--        appPackageName = 'com.shatteredpixel.shatteredpixeldungeon'
-+        appName = 'SHPD seed explorer'
-+        appPackageName = 'com.shatteredpixel.shpd_seed_explorer'
- 
-         appVersionCode = 642
-         appVersionName = '1.3.0'
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
 index 8b43071c4..e0aafd767 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/actors/hero/Hero.java
@@ -439,10 +395,10 @@ index b60d32ef4..78b9e608f 100644
  		((HeroSprite)curUser.sprite).read();
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
 new file mode 100644
-index 000000000..c3db6aea6
+index 000000000..b9f62f144
 --- /dev/null
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/scrolls/ScrollOfAwareness.java
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,221 @@
 +/*
 + * Pixel Dungeon
 + * Copyright (C) 2012-2015 Oleg Dolya
@@ -467,17 +423,30 @@ index 000000000..c3db6aea6
 +package com.shatteredpixel.shatteredpixeldungeon.items.scrolls;
 +
 +import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
 +
 +import com.shatteredpixel.shatteredpixeldungeon.Assets;
 +import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 +import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Ghost;
 +import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
 +import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
++import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
++import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
++import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
++import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 +import com.shatteredpixel.shatteredpixeldungeon.items.Item;
++import com.shatteredpixel.shatteredpixeldungeon.items.Heap.Type;
 +import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 +import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
++import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
++import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
++import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
 +import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
++import com.shatteredpixel.shatteredpixeldungeon.items.quest.CeremonialCandle;
 +import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
++import com.shatteredpixel.shatteredpixeldungeon.items.quest.Embers;
++import com.shatteredpixel.shatteredpixeldungeon.items.quest.Pickaxe;
 +import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 +import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 +import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
@@ -489,28 +458,50 @@ index 000000000..c3db6aea6
 +import com.watabou.noosa.audio.Sample;
 +
 +public class ScrollOfAwareness extends Scroll {
-+	
++
 +	{
 +		icon = ItemSpriteSheet.Icons.SCROLL_FORESIGHT;
 +		image = ItemSpriteSheet.SCROLL_YNGVI;
 +		unique = true;
 +	}
-+	
-+	private void addText(String caption, ArrayList<? extends Item> items, StringBuilder builder) {
++
++	List<Class<? extends Item>> blacklist;
++
++	private void addTextItems(String caption, ArrayList<Heap> items, StringBuilder builder) {
 +		if (!items.isEmpty()) {
 +			builder.append(caption + ":\n");
 +
-+			for (Item item : items) {
-+				String cursed_status = "";
-+				String level = "";
-+				String quantity = "";
++			for (Heap h : items) {
++				Item i = h.peek();
 +
-+				if (item.cursed && !(item instanceof Armor || item instanceof Weapon
-+					|| item instanceof CorpseDust)) cursed_status = "cursed ";
-+				if (item.level() > 0) level = " +" + Integer.toString(item.level());
-+				if (item.quantity() > 1) quantity = " x" + Integer.toString(item.quantity());
-+				
-+				builder.append("- " + cursed_status + item.name().toLowerCase() + level + quantity + "\n");
++				if (((i instanceof Armor && ((Armor) i).hasGoodGlyph()) ||
++					 (i instanceof Weapon && ((Weapon) i).hasGoodEnchant()) ||
++					 (i instanceof Ring)) && i.cursed)
++					builder.append("- cursed " + i.toString().toLowerCase());
++
++				else
++					builder.append("- " + i.toString().toLowerCase());
++
++				if (h.type != Type.HEAP)
++					builder.append(" (" + h.toString().toLowerCase() + ")");
++
++				builder.append("\n");
++			}
++
++			builder.append("\n");
++		}
++	}
++
++	private void addTextQuest(String caption, ArrayList<Item> items, StringBuilder builder) {
++		if (!items.isEmpty()) {
++			builder.append(caption + ":\n");
++
++			for (Item i : items) {
++				if (i.cursed)
++					builder.append("- cursed " + i.toString().toLowerCase() + "\n");
++
++				else
++					builder.append("- " + i.toString().toLowerCase() + "\n");
 +			}
 +
 +			builder.append("\n");
@@ -519,45 +510,26 @@ index 000000000..c3db6aea6
 +
 +	@Override
 +	public void doRead() {
++		blacklist = Arrays.asList(Gold.class, Dewdrop.class, IronKey.class, GoldenKey.class, CrystalKey.class, EnergyCrystal.class,
++								  CorpseDust.class, Embers.class, CeremonialCandle.class, Pickaxe.class);
++
++		List<Heap> heaps = Dungeon.level.heaps.valueList();
 +		StringBuilder builder = new StringBuilder();
++		ArrayList<Heap> scrolls = new ArrayList<>();
++		ArrayList<Heap> potions = new ArrayList<>();
++		ArrayList<Heap> equipment = new ArrayList<>();
++		ArrayList<Heap> rings = new ArrayList<>();
++		ArrayList<Heap> artifacts = new ArrayList<>();
++		ArrayList<Heap> wands = new ArrayList<>();
++		ArrayList<Heap> others = new ArrayList<>();
 +
-+		ArrayList<Scroll> scrolls = new ArrayList<>();
-+		ArrayList<Potion> potions = new ArrayList<>();
-+		ArrayList<Item> equipment = new ArrayList<>();
-+		ArrayList<Ring> rings = new ArrayList<>();
-+		ArrayList<Artifact> artifacts = new ArrayList<>();
-+		ArrayList<Wand> wands = new ArrayList<>();
-+		ArrayList<Item> others = new ArrayList<>();
-+
-+		for (Item item : Dungeon.level.generatedItems) {
-+			if (item instanceof Scroll)
-+				scrolls.add((Scroll) item);
-+
-+			else if (item instanceof Potion)
-+				potions.add((Potion) item);
-+
-+			else if (item instanceof MeleeWeapon || item instanceof Armor)
-+				equipment.add(item);
-+			
-+			else if (item instanceof Ring)
-+				rings.add((Ring) item);
-+			
-+			else if (item instanceof Artifact)
-+				artifacts.add((Artifact) item);
-+			
-+			else if (item instanceof Wand)
-+				wands.add((Wand) item);
-+			
-+			else
-+				others.add(item);
-+		}
-+
++		// list quest rewards
 +		if (Ghost.Quest.armor != null && Ghost.Quest.depth == Dungeon.depth) {
 +			ArrayList<Item> rewards = new ArrayList<>();
 +			rewards.add(Ghost.Quest.armor);
 +			rewards.add(Ghost.Quest.weapon);
 +
-+			addText("_Ghost quest rewards_", rewards, builder);
++			addTextQuest("_Ghost quest rewards_", rewards, builder);
 +		}
 +
 +		if (Wandmaker.Quest.wand1 != null && Wandmaker.Quest.depth == Dungeon.depth) {
@@ -578,23 +550,38 @@ index 000000000..c3db6aea6
 +					builder.append("rotberry seed\n\n");
 +			}
 +
-+			addText("_Wandmaker quest rewards_", rewards, builder);
++			addTextQuest("_Wandmaker quest rewards_", rewards, builder);
 +		}
 +
 +		if (Imp.Quest.reward != null && Imp.Quest.depth == Dungeon.depth) {
-+			ArrayList<Ring> rewards = new ArrayList<>();
-+			rewards.add(Imp.Quest.reward);
++			ArrayList<Item> rewards = new ArrayList<>();
++			rewards.add(Imp.Quest.reward.identify());
 +
-+			addText("_Imp quest reward_", rewards, builder);
++			addTextQuest("_Imp quest reward_", rewards, builder);
 +		}
 +
-+		addText("_Scrolls_", scrolls, builder);
-+		addText("_Potions_", potions, builder);
-+		addText("_Equipment_", equipment, builder);
-+		addText("_Rings_", rings, builder);
-+		addText("_Artifacts_", artifacts, builder);
-+		addText("_Wands_", wands, builder);
-+		addText("_Other_", others, builder);
++		// list items
++		for (Heap h : heaps) {
++			Item item = h.peek();
++
++			if (h.type == Heap.Type.FOR_SALE) continue;
++			else if (blacklist.contains(item.getClass())) continue;
++			else if (item instanceof Scroll) scrolls.add(h);
++			else if (item instanceof Potion) potions.add(h);
++			else if (item instanceof MeleeWeapon || item instanceof Armor) equipment.add(h);
++			else if (item instanceof Ring) rings.add(h);
++			else if (item instanceof Artifact) artifacts.add( h);
++			else if (item instanceof Wand) wands.add(h);
++			else others.add(h);
++		}
++
++		addTextItems("_Scrolls_", scrolls, builder);
++		addTextItems("_Potions_", potions, builder);
++		addTextItems("_Equipment_", equipment, builder);
++		addTextItems("_Rings_", rings, builder);
++		addTextItems("_Artifacts_", artifacts, builder);
++		addTextItems("_Wands_", wands, builder);
++		addTextItems("_Other_", others, builder);
 +
 +		if (Dungeon.depth % 5 == 0) {
 +			GLog.i("No items found on this level");
@@ -631,7 +618,7 @@ index 000000000..c3db6aea6
 +    @Override public boolean isKnown() {
 +		return true;
 +	}
-+	
++
 +}
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/journal/Document.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/journal/Document.java
 index 22235f8ac..df86fe32d 100644
@@ -697,7 +684,7 @@ index 22235f8ac..df86fe32d 100644
  	
  	private static final String DOCUMENTS = "documents";
 diff --git a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
-index 4f3f91417..503d36364 100644
+index 4f3f91417..4822b3b57 100644
 --- a/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
 +++ b/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/levels/Level.java
 @@ -52,13 +52,17 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
@@ -723,7 +710,7 @@ index 4f3f91417..503d36364 100644
  	protected ArrayList<Item> itemsToSpawn = new ArrayList<>();
  
 +	// TODO: make it an array of heaps when I can identify the heap type
-+	public ArrayList<Item> generatedItems = new ArrayList<>();
++	public ArrayList<Heap> generatedItems = new ArrayList<>();
 +
  	protected Group visuals;
  	
@@ -759,9 +746,9 @@ index 4f3f91417..503d36364 100644
  		}
  		
 +		collection = bundle.getCollection( GENERATED_ITEMS );
-+		for (Bundlable i : collection) {
-+			Item item = (Item)i;
-+			generatedItems.add( item );
++		for (Bundlable h : collection) {
++			Heap heap = (Heap)h;
++			generatedItems.add( heap );
 +		}
 +
  		collection = bundle.getCollection( PLANTS );
@@ -784,7 +771,7 @@ index 4f3f91417..503d36364 100644
  		} else {
  			heap.drop(item);
  		}
-@@ -902,7 +919,15 @@ public abstract class Level implements Bundlable {
+@@ -902,7 +919,12 @@ public abstract class Level implements Bundlable {
  		if (Dungeon.level != null && ShatteredPixelDungeon.scene() instanceof GameScene) {
  			pressCell( cell );
  		}
@@ -792,11 +779,8 @@ index 4f3f91417..503d36364 100644
 +
 +		heap.seen = true;
 +
-+		if (!(item instanceof Key || item instanceof Dewdrop
-+			  || item instanceof Gold || item instanceof EnergyCrystal)) {
-+			item.identify();
-+			generatedItems.add(item);
-+		}
++		item.identify();
++		generatedItems.add(heap);
 +
  		return heap;
  	}
@@ -1128,6 +1112,3 @@ index e41854788..42fcc378a 100644
  		
  		resize(WIDTH, HEIGHT);
  		
--- 
-2.37.0
-
