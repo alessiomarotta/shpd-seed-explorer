@@ -22,17 +22,30 @@
 package com.shatteredpixel.shatteredpixeldungeon.items.scrolls;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Ghost;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
+import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
+import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap.Type;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.CeremonialCandle;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.Embers;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.Pickaxe;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
@@ -44,28 +57,50 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.watabou.noosa.audio.Sample;
 
 public class ScrollOfAwareness extends Scroll {
-	
+
 	{
 		icon = ItemSpriteSheet.Icons.SCROLL_FORESIGHT;
 		image = ItemSpriteSheet.SCROLL_YNGVI;
 		unique = true;
 	}
-	
-	private void addText(String caption, ArrayList<? extends Item> items, StringBuilder builder) {
+
+	List<Class<? extends Item>> blacklist;
+
+	private void addTextItems(String caption, ArrayList<Heap> items, StringBuilder builder) {
 		if (!items.isEmpty()) {
 			builder.append(caption + ":\n");
 
-			for (Item item : items) {
-				String cursed_status = "";
-				String level = "";
-				String quantity = "";
+			for (Heap h : items) {
+				Item i = h.peek();
 
-				if (item.cursed && !(item instanceof Armor || item instanceof Weapon
-					|| item instanceof CorpseDust)) cursed_status = "cursed ";
-				if (item.level() > 0) level = " +" + Integer.toString(item.level());
-				if (item.quantity() > 1) quantity = " x" + Integer.toString(item.quantity());
-				
-				builder.append("- " + cursed_status + item.name().toLowerCase() + level + quantity + "\n");
+				if (((i instanceof Armor && ((Armor) i).hasGoodGlyph()) ||
+					 (i instanceof Weapon && ((Weapon) i).hasGoodEnchant()) ||
+					 (i instanceof Ring)) && i.cursed)
+					builder.append("- cursed " + i.toString().toLowerCase());
+
+				else
+					builder.append("- " + i.toString().toLowerCase());
+
+				if (h.type != Type.HEAP)
+					builder.append(" (" + h.toString().toLowerCase() + ")");
+
+				builder.append("\n");
+			}
+
+			builder.append("\n");
+		}
+	}
+
+	private void addTextQuest(String caption, ArrayList<Item> items, StringBuilder builder) {
+		if (!items.isEmpty()) {
+			builder.append(caption + ":\n");
+
+			for (Item i : items) {
+				if (i.cursed)
+					builder.append("- cursed " + i.toString().toLowerCase() + "\n");
+
+				else
+					builder.append("- " + i.toString().toLowerCase() + "\n");
 			}
 
 			builder.append("\n");
@@ -74,45 +109,26 @@ public class ScrollOfAwareness extends Scroll {
 
 	@Override
 	public void doRead() {
+		blacklist = Arrays.asList(Gold.class, Dewdrop.class, IronKey.class, GoldenKey.class, CrystalKey.class, EnergyCrystal.class,
+								  CorpseDust.class, Embers.class, CeremonialCandle.class, Pickaxe.class);
+
+		List<Heap> heaps = Dungeon.level.heaps.valueList();
 		StringBuilder builder = new StringBuilder();
+		ArrayList<Heap> scrolls = new ArrayList<>();
+		ArrayList<Heap> potions = new ArrayList<>();
+		ArrayList<Heap> equipment = new ArrayList<>();
+		ArrayList<Heap> rings = new ArrayList<>();
+		ArrayList<Heap> artifacts = new ArrayList<>();
+		ArrayList<Heap> wands = new ArrayList<>();
+		ArrayList<Heap> others = new ArrayList<>();
 
-		ArrayList<Scroll> scrolls = new ArrayList<>();
-		ArrayList<Potion> potions = new ArrayList<>();
-		ArrayList<Item> equipment = new ArrayList<>();
-		ArrayList<Ring> rings = new ArrayList<>();
-		ArrayList<Artifact> artifacts = new ArrayList<>();
-		ArrayList<Wand> wands = new ArrayList<>();
-		ArrayList<Item> others = new ArrayList<>();
-
-		for (Item item : Dungeon.level.generatedItems) {
-			if (item instanceof Scroll)
-				scrolls.add((Scroll) item);
-
-			else if (item instanceof Potion)
-				potions.add((Potion) item);
-
-			else if (item instanceof MeleeWeapon || item instanceof Armor)
-				equipment.add(item);
-			
-			else if (item instanceof Ring)
-				rings.add((Ring) item);
-			
-			else if (item instanceof Artifact)
-				artifacts.add((Artifact) item);
-			
-			else if (item instanceof Wand)
-				wands.add((Wand) item);
-			
-			else
-				others.add(item);
-		}
-
+		// list quest rewards
 		if (Ghost.Quest.armor != null && Ghost.Quest.depth == Dungeon.depth) {
 			ArrayList<Item> rewards = new ArrayList<>();
 			rewards.add(Ghost.Quest.armor);
 			rewards.add(Ghost.Quest.weapon);
 
-			addText("_Ghost quest rewards_", rewards, builder);
+			addTextQuest("_Ghost quest rewards_", rewards, builder);
 		}
 
 		if (Wandmaker.Quest.wand1 != null && Wandmaker.Quest.depth == Dungeon.depth) {
@@ -133,23 +149,38 @@ public class ScrollOfAwareness extends Scroll {
 					builder.append("rotberry seed\n\n");
 			}
 
-			addText("_Wandmaker quest rewards_", rewards, builder);
+			addTextQuest("_Wandmaker quest rewards_", rewards, builder);
 		}
 
 		if (Imp.Quest.reward != null && Imp.Quest.depth == Dungeon.depth) {
-			ArrayList<Ring> rewards = new ArrayList<>();
-			rewards.add(Imp.Quest.reward);
+			ArrayList<Item> rewards = new ArrayList<>();
+			rewards.add(Imp.Quest.reward.identify());
 
-			addText("_Imp quest reward_", rewards, builder);
+			addTextQuest("_Imp quest reward_", rewards, builder);
 		}
 
-		addText("_Scrolls_", scrolls, builder);
-		addText("_Potions_", potions, builder);
-		addText("_Equipment_", equipment, builder);
-		addText("_Rings_", rings, builder);
-		addText("_Artifacts_", artifacts, builder);
-		addText("_Wands_", wands, builder);
-		addText("_Other_", others, builder);
+		// list items
+		for (Heap h : heaps) {
+			Item item = h.peek();
+
+			if (h.type == Heap.Type.FOR_SALE) continue;
+			else if (blacklist.contains(item.getClass())) continue;
+			else if (item instanceof Scroll) scrolls.add(h);
+			else if (item instanceof Potion) potions.add(h);
+			else if (item instanceof MeleeWeapon || item instanceof Armor) equipment.add(h);
+			else if (item instanceof Ring) rings.add(h);
+			else if (item instanceof Artifact) artifacts.add( h);
+			else if (item instanceof Wand) wands.add(h);
+			else others.add(h);
+		}
+
+		addTextItems("_Scrolls_", scrolls, builder);
+		addTextItems("_Potions_", potions, builder);
+		addTextItems("_Equipment_", equipment, builder);
+		addTextItems("_Rings_", rings, builder);
+		addTextItems("_Artifacts_", artifacts, builder);
+		addTextItems("_Wands_", wands, builder);
+		addTextItems("_Other_", others, builder);
 
 		if (Dungeon.depth % 5 == 0) {
 			GLog.i("No items found on this level");
@@ -186,5 +217,5 @@ public class ScrollOfAwareness extends Scroll {
     @Override public boolean isKnown() {
 		return true;
 	}
-	
+
 }
